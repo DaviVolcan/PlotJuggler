@@ -50,7 +50,7 @@ TEST_F(CsvLoggerTest, WritesHeaderFromFirstSampleAndRows)
   logger.close();
 
   const std::string content = readFile(logger.currentFile());
-  EXPECT_EQ(content, "t,n,ia\n0.001,1,0.5\n0.002,2,0.6\n");
+  EXPECT_EQ(content, "t,n,ia\n0.001000,1,0.5\n0.002000,2,0.6\n");
 }
 
 TEST_F(CsvLoggerTest, RotatesFileOnTargetReset)
@@ -78,7 +78,7 @@ TEST_F(CsvLoggerTest, MissingKeyBecomesEmptyCell)
   logger.close();
 
   const std::string content = readFile(logger.currentFile());
-  EXPECT_EQ(content, "t,n,ia\n0.001,1,0.5\n0.002,2,\n");
+  EXPECT_EQ(content, "t,n,ia\n0.001000,1,0.5\n0.002000,2,\n");
 }
 
 TEST_F(CsvLoggerTest, DisabledWhenDirectoryEmpty)

@@ -24,8 +24,15 @@ void CsvLogger::close()
 std::string CsvLogger::formatValue(double value)
 {
   char buf[32];
-  // %g preserva a precisao sem encher de zeros
-  std::snprintf(buf, sizeof(buf), "%g", value);
+  // %.10g preserva a precisao sem encher de zeros
+  std::snprintf(buf, sizeof(buf), "%.10g", value);
+  return buf;
+}
+
+std::string CsvLogger::formatTime(double t)
+{
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%.6f", t);
   return buf;
 }
 
@@ -70,7 +77,7 @@ void CsvLogger::onSample(const TelemetrySample& sample)
     openNewFile(sample);
   }
 
-  std::string row = formatValue(sample.t);
+  std::string row = formatTime(sample.t);
   for (const auto& key : _header)
   {
     row += ",";

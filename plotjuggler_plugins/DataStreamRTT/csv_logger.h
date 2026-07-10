@@ -24,6 +24,7 @@ public:
 private:
   void openNewFile(const TelemetrySample& first);
   static std::string formatValue(double value);
+  static std::string formatTime(double t);
 
   std::string _dir;
   std::string _current_file;

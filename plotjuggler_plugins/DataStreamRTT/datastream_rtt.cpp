@@ -3,6 +3,7 @@
 #include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -82,6 +83,15 @@ bool DataStreamRTT::start(QStringList*)
   const bool csv_enabled = csv_check->isChecked();
   const QString csv_dir = csv_dir_edit->text();
 
+  if (csv_enabled && (csv_dir.isEmpty() || !QDir().mkpath(csv_dir)))
+  {
+    QMessageBox::warning(
+        nullptr, "RTT Streamer",
+        "Gravacao CSV habilitada mas o diretorio e invalido ou nao pode ser criado.\n"
+        "Configure um diretorio valido e inicie de novo.");
+    return false;
+  }
+
   settings.setValue("DataStreamRTT/host", _host);
   settings.setValue("DataStreamRTT/port", _port);
   settings.setValue("DataStreamRTT/channel", _channel);
@@ -111,6 +121,7 @@ void DataStreamRTT::connectToServer()
     return;
   }
   _parser = LineParser();
+  _csv_logger.close();
   _socket->abort();
   _socket->connectToHost(_host, static_cast<quint16>(_port));
 }
