@@ -7,6 +7,7 @@
 #include <QtPlugin>
 
 #include "PlotJuggler/datastreamer_base.h"
+#include "csv_logger.h"
 #include "line_parser.h"
 
 class DataStreamRTT : public PJ::DataStreamer
@@ -50,6 +51,7 @@ private:
   QTcpSocket* _socket = nullptr;
   QTimer* _reconnect_timer = nullptr;
   LineParser _parser;
+  CsvLogger _csv_logger;
   bool _running = false;
   bool _warned_once = false;
   QString _host;

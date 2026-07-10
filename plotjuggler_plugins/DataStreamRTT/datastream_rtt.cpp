@@ -29,6 +29,10 @@ bool DataStreamRTT::start(QStringList*)
   _port = settings.value("DataStreamRTT/port", 19021).toInt();
   _channel = settings.value("DataStreamRTT/channel", 1).toInt();
 
+  const bool csv_enabled = settings.value("DataStreamRTT/csv_enabled", false).toBool();
+  const QString csv_dir = settings.value("DataStreamRTT/csv_dir", "").toString();
+  _csv_logger.setDirectory(csv_enabled ? csv_dir.toStdString() : std::string());
+
   _running = true;
   _warned_once = false;
   connectToServer();
@@ -39,6 +43,7 @@ void DataStreamRTT::shutdown()
 {
   _running = false;
   _reconnect_timer->stop();
+  _csv_logger.close();
   _socket->abort();
 }
 
@@ -99,6 +104,7 @@ void DataStreamRTT::pushSamples(const std::vector<TelemetrySample>& samples)
     std::lock_guard<std::mutex> lock(mutex());
     for (const auto& sample : samples)
     {
+      _csv_logger.onSample(sample);
       if (sample.target_reset)
       {
         reset_seen = true;
