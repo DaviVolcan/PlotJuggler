@@ -1,6 +1,7 @@
 #include "line_parser.h"
 
-#include <cstdlib>
+#include <charconv>
+#include <cmath>
 
 std::vector<TelemetrySample> LineParser::feed(const char* data, size_t len)
 {
@@ -53,9 +54,11 @@ bool LineParser::parseLine(const std::string& line, TelemetrySample& out)
     }
     std::string key = line.substr(start, eq - start);
     const std::string value_str = line.substr(eq + 1, comma - eq - 1);
-    char* end = nullptr;
-    const double value = std::strtod(value_str.c_str(), &end);
-    if (end == value_str.c_str() || *end != '\0')
+    double value = 0.0;
+    const char* vbegin = value_str.c_str();
+    const char* vend = vbegin + value_str.size();
+    const auto [ptr, ec] = std::from_chars(vbegin, vend, value);
+    if (ec != std::errc() || ptr != vend || !std::isfinite(value))
     {
       return false;
     }

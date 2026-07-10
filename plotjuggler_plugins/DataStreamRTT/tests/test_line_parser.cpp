@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <clocale>
+
 #include "line_parser.h"
 
 TEST(LineParser, ParsesValidLine)
@@ -85,4 +87,37 @@ TEST(LineParser, RejectsGarbageValues)
   ASSERT_EQ(samples.size(), 1u);
   EXPECT_DOUBLE_EQ(samples[0].t, 2.0);
   EXPECT_EQ(p.malformedCount(), 2u);
+}
+
+TEST(LineParser, RejectsNonFiniteValues)
+{
+  LineParser p;
+  const std::string in = "t=1.0,n=1,ia=nan,ib=0\n"
+                         "t=2.0,n=2,ia=inf,ib=0\n"
+                         "t=3.0,n=3,ia=0.5,ib=-inf\n"
+                         "t=4.0,n=4,ia=0,ib=0\n";
+  auto samples = p.feed(in.data(), in.size());
+  ASSERT_EQ(samples.size(), 1u);
+  EXPECT_DOUBLE_EQ(samples[0].t, 4.0);
+  EXPECT_EQ(p.malformedCount(), 3u);
+}
+
+TEST(LineParser, ParsesIndependentOfLocale)
+{
+  // QApplication chama setlocale(LC_ALL, "") no Unix; num locale com
+  // virgula decimal o parser nao pode quebrar com o ponto decimal.
+  const char* prev = setlocale(LC_NUMERIC, nullptr);
+  const std::string saved = prev ? prev : "C";
+  if (setlocale(LC_NUMERIC, "pt_BR.UTF-8") == nullptr)
+  {
+    GTEST_SKIP() << "locale pt_BR.UTF-8 indisponivel";
+  }
+  LineParser p;
+  const std::string in = "t=1.5,n=1,ia=0.25,ib=-0.5\n";
+  auto samples = p.feed(in.data(), in.size());
+  setlocale(LC_NUMERIC, saved.c_str());
+  ASSERT_EQ(samples.size(), 1u);
+  EXPECT_DOUBLE_EQ(samples[0].t, 1.5);
+  ASSERT_EQ(samples[0].values.size(), 3u);
+  EXPECT_DOUBLE_EQ(samples[0].values[1].second, 0.25);
 }
