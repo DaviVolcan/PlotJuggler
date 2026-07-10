@@ -2,9 +2,12 @@
    porta telnet TCP do J-Link GDB Server (padrao localhost:19021). */
 #pragma once
 
+#include <QTcpSocket>
+#include <QTimer>
 #include <QtPlugin>
 
 #include "PlotJuggler/datastreamer_base.h"
+#include "line_parser.h"
 
 class DataStreamRTT : public PJ::DataStreamer
 {
@@ -13,7 +16,7 @@ class DataStreamRTT : public PJ::DataStreamer
   Q_INTERFACES(PJ::DataStreamer)
 
 public:
-  DataStreamRTT() = default;
+  DataStreamRTT();
 
   ~DataStreamRTT() override;
 
@@ -35,6 +38,21 @@ public:
 
   bool xmlLoadState(const QDomElement& parent_element) override;
 
+private slots:
+  void onConnected();
+  void onReadyRead();
+  void onSocketClosed();
+
 private:
+  void connectToServer();
+  void pushSamples(const std::vector<TelemetrySample>& samples);
+
+  QTcpSocket* _socket = nullptr;
+  QTimer* _reconnect_timer = nullptr;
+  LineParser _parser;
   bool _running = false;
+  bool _warned_once = false;
+  QString _host;
+  int _port = 19021;
+  int _channel = 1;
 };
