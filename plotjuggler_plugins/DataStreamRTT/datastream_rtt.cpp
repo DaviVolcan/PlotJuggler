@@ -29,7 +29,6 @@ bool DataStreamRTT::start(QStringList*)
   _port = settings.value("DataStreamRTT/port", 19021).toInt();
   _channel = settings.value("DataStreamRTT/channel", 1).toInt();
 
-  _parser = LineParser();
   _running = true;
   _warned_once = false;
   connectToServer();
@@ -49,6 +48,7 @@ void DataStreamRTT::connectToServer()
   {
     return;
   }
+  _parser = LineParser();
   _socket->abort();
   _socket->connectToHost(_host, static_cast<quint16>(_port));
 }
@@ -67,17 +67,19 @@ void DataStreamRTT::onSocketClosed()
   {
     return;
   }
+  _reconnect_timer->start();
   if (!_warned_once)
   {
     _warned_once = true;
-    QMessageBox::information(
-        nullptr, "RTT Streamer",
+    auto* box = new QMessageBox(
+        QMessageBox::Information, "RTT Streamer",
         QString("Sem conexao com %1:%2 (o GDB server do J-Link esta rodando?).\n"
                 "Vou tentar reconectar a cada segundo em segundo plano.")
             .arg(_host)
             .arg(_port));
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->show();
   }
-  _reconnect_timer->start();
 }
 
 void DataStreamRTT::onReadyRead()
@@ -100,10 +102,6 @@ void DataStreamRTT::pushSamples(const std::vector<TelemetrySample>& samples)
       if (sample.target_reset)
       {
         reset_seen = true;
-        for (auto& it : dataMap().numeric)
-        {
-          it.second.clear();
-        }
       }
       for (const auto& [key, value] : sample.values)
       {

@@ -2,7 +2,7 @@
 """Fake do telnet RTT do GDB server: reproduz um capture na porta 19021.
 
 Uso: replay_server.py [arquivo] [taxa_hz]
-Padrao: tests/data/capture_spike.txt a 1000 Hz, em loop por cliente.
+Padrao: tests/data/capture_sample.txt a 1000 Hz, em loop por cliente.
 """
 import os
 import socket
@@ -11,7 +11,7 @@ import time
 
 base = os.path.dirname(os.path.abspath(__file__))
 path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    base, "..", "tests", "data", "capture_spike.txt")
+    base, "..", "tests", "data", "capture_sample.txt")
 rate_hz = float(sys.argv[2]) if len(sys.argv) > 2 else 1000.0
 
 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
