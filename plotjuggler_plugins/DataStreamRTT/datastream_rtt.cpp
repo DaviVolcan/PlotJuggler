@@ -1,7 +1,16 @@
 #include "datastream_rtt.h"
 
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QFileDialog>
+#include <QFormLayout>
+#include <QHBoxLayout>
+#include <QLineEdit>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
+#include <QSpinBox>
 
 DataStreamRTT::DataStreamRTT()
 {
@@ -25,12 +34,60 @@ DataStreamRTT::~DataStreamRTT()
 bool DataStreamRTT::start(QStringList*)
 {
   QSettings settings;
-  _host = settings.value("DataStreamRTT/host", "127.0.0.1").toString();
-  _port = settings.value("DataStreamRTT/port", 19021).toInt();
-  _channel = settings.value("DataStreamRTT/channel", 1).toInt();
+  QDialog dialog;
+  dialog.setWindowTitle("RTT Streamer");
+  auto* layout = new QFormLayout(&dialog);
 
-  const bool csv_enabled = settings.value("DataStreamRTT/csv_enabled", false).toBool();
-  const QString csv_dir = settings.value("DataStreamRTT/csv_dir", "").toString();
+  auto* host_edit = new QLineEdit(settings.value("DataStreamRTT/host", "127.0.0.1").toString());
+  auto* port_spin = new QSpinBox();
+  port_spin->setRange(1, 65535);
+  port_spin->setValue(settings.value("DataStreamRTT/port", 19021).toInt());
+  auto* channel_spin = new QSpinBox();
+  channel_spin->setRange(0, 15);
+  channel_spin->setValue(settings.value("DataStreamRTT/channel", 1).toInt());
+  auto* csv_check = new QCheckBox("Gravar CSV do ensaio");
+  csv_check->setChecked(settings.value("DataStreamRTT/csv_enabled", false).toBool());
+  auto* csv_dir_edit = new QLineEdit(settings.value("DataStreamRTT/csv_dir", "").toString());
+  auto* csv_browse = new QPushButton("...");
+  QObject::connect(csv_browse, &QPushButton::clicked, [&]() {
+    const QString dir = QFileDialog::getExistingDirectory(&dialog, "Diretorio dos CSV");
+    if (!dir.isEmpty())
+    {
+      csv_dir_edit->setText(dir);
+    }
+  });
+  auto* dir_row = new QHBoxLayout();
+  dir_row->addWidget(csv_dir_edit);
+  dir_row->addWidget(csv_browse);
+
+  layout->addRow("Host", host_edit);
+  layout->addRow("Porta", port_spin);
+  layout->addRow("Canal RTT", channel_spin);
+  layout->addRow(csv_check);
+  layout->addRow("Diretorio CSV", dir_row);
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+  QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+  layout->addRow(buttons);
+
+  if (dialog.exec() != QDialog::Accepted)
+  {
+    return false;
+  }
+
+  _host = host_edit->text();
+  _port = port_spin->value();
+  _channel = channel_spin->value();
+  const bool csv_enabled = csv_check->isChecked();
+  const QString csv_dir = csv_dir_edit->text();
+
+  settings.setValue("DataStreamRTT/host", _host);
+  settings.setValue("DataStreamRTT/port", _port);
+  settings.setValue("DataStreamRTT/channel", _channel);
+  settings.setValue("DataStreamRTT/csv_enabled", csv_enabled);
+  settings.setValue("DataStreamRTT/csv_dir", csv_dir);
+
   _csv_logger.setDirectory(csv_enabled ? csv_dir.toStdString() : std::string());
 
   _running = true;
@@ -136,12 +193,26 @@ void DataStreamRTT::pushSamples(const std::vector<TelemetrySample>& samples)
   emit dataReceived();
 }
 
-bool DataStreamRTT::xmlSaveState(QDomDocument&, QDomElement&) const
+bool DataStreamRTT::xmlSaveState(QDomDocument& doc, QDomElement& parent_element) const
 {
+  QDomElement elem = doc.createElement("rtt_streamer");
+  elem.setAttribute("host", _host);
+  elem.setAttribute("port", _port);
+  elem.setAttribute("channel", _channel);
+  parent_element.appendChild(elem);
   return true;
 }
 
-bool DataStreamRTT::xmlLoadState(const QDomElement&)
+bool DataStreamRTT::xmlLoadState(const QDomElement& parent_element)
 {
+  const QDomElement elem = parent_element.firstChildElement("rtt_streamer");
+  if (elem.isNull())
+  {
+    return false;
+  }
+  QSettings settings;
+  settings.setValue("DataStreamRTT/host", elem.attribute("host", "127.0.0.1"));
+  settings.setValue("DataStreamRTT/port", elem.attribute("port", "19021").toInt());
+  settings.setValue("DataStreamRTT/channel", elem.attribute("channel", "1").toInt());
   return true;
 }
