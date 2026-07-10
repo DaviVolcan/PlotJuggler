@@ -2,6 +2,15 @@ add_library(line_parser STATIC line_parser.cpp)
 target_include_directories(line_parser PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(line_parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+add_library(DataStreamRTT SHARED datastream_rtt.cpp)
+
+target_link_libraries(DataStreamRTT PRIVATE Qt5::Widgets Qt5::Network Qt5::Xml
+                                            plotjuggler_base line_parser)
+
+target_compile_definitions(DataStreamRTT PRIVATE QT_PLUGIN)
+
+install(TARGETS DataStreamRTT DESTINATION ${PJ_PLUGIN_INSTALL_DIRECTORY})
+
 if(BUILD_TESTING)
   find_package(GTest QUIET)
   if(NOT GTest_FOUND)
