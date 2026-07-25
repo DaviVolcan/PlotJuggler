@@ -56,6 +56,12 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
     throw std::runtime_error("RttDataMap: faltando 'record_size' ou 'fields'");
   }
 
+  if (root.contains("byte_order") && root.value("byte_order").toString() != "little")
+  {
+    throw std::runtime_error("RttDataMap: byte_order so' suporta 'little' (decode e' memcpy "
+                              "direto, sem conversao de endianness)");
+  }
+
   RttDataMap map;
   const int record_size_int = root.value("record_size").toInt();
   if (record_size_int < 0)
@@ -66,6 +72,10 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
   map.seq_field = root.value("seq_field").toString().toStdString();
   map.nominal_rate_hz = root.value("nominal_rate_hz").toDouble(1000.0);
 
+  if (!root.value("fields").isArray())
+  {
+    throw std::runtime_error("RttDataMap: 'fields' precisa ser um array");
+  }
   const QJsonArray fields = root.value("fields").toArray();
   for (const QJsonValue& field_value : fields)
   {

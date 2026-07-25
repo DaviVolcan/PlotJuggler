@@ -94,3 +94,26 @@ TEST(RttDataMap, RejectsNegativeFieldOffset)
   )json";
   EXPECT_THROW(RttDataMap::loadFromJsonText(json), std::runtime_error);
 }
+
+TEST(RttDataMap, RejectsNonArrayFields)
+{
+  const char* json = R"json({"record_size": 4, "fields": "oops"})json";
+  EXPECT_THROW(RttDataMap::loadFromJsonText(json), std::runtime_error);
+}
+
+TEST(RttDataMap, RejectsNonLittleByteOrder)
+{
+  const char* json = R"json(
+  {
+    "record_size": 4,
+    "byte_order": "big",
+    "fields": [{"name": "x", "offset": 0, "type": "uint32"}]
+  }
+  )json";
+  EXPECT_THROW(RttDataMap::loadFromJsonText(json), std::runtime_error);
+}
+
+TEST(RttDataMap, LoadFromFileThrowsOnMissingFile)
+{
+  EXPECT_THROW(RttDataMap::loadFromFile("/no/such/file.json"), std::runtime_error);
+}
