@@ -6,9 +6,12 @@
 #include <QTimer>
 #include <QtPlugin>
 
+#include <memory>
+
 #include "PlotJuggler/datastreamer_base.h"
+#include "binary_parser.h"
 #include "csv_logger.h"
-#include "line_parser.h"
+#include "rtt_data_map.h"
 
 class DataStreamRTT : public PJ::DataStreamer
 {
@@ -50,7 +53,9 @@ private:
 
   QTcpSocket* _socket = nullptr;
   QTimer* _reconnect_timer = nullptr;
-  LineParser _parser;
+  std::unique_ptr<BinaryParser> _parser;
+  RttDataMap _data_map;
+  QString _data_map_path;
   CsvLogger _csv_logger;
   bool _running = false;
   bool _warned_once = false;

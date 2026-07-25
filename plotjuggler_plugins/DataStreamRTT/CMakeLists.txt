@@ -19,7 +19,7 @@ set_target_properties(csv_logger PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(DataStreamRTT SHARED datastream_rtt.cpp)
 
 target_link_libraries(DataStreamRTT PRIVATE Qt5::Widgets Qt5::Network Qt5::Xml
-                                            plotjuggler_base line_parser csv_logger)
+                                            plotjuggler_base binary_parser rtt_data_map csv_logger)
 
 target_compile_definitions(DataStreamRTT PRIVATE QT_PLUGIN)
 
