@@ -72,3 +72,25 @@ TEST(RttDataMap, RejectsUnknownSeqField)
   )json";
   EXPECT_THROW(RttDataMap::loadFromJsonText(json), std::runtime_error);
 }
+
+TEST(RttDataMap, RejectsNegativeRecordSize)
+{
+  const char* json = R"json(
+  {
+    "record_size": -1,
+    "fields": [{"name": "x", "offset": 0, "type": "uint32"}]
+  }
+  )json";
+  EXPECT_THROW(RttDataMap::loadFromJsonText(json), std::runtime_error);
+}
+
+TEST(RttDataMap, RejectsNegativeFieldOffset)
+{
+  const char* json = R"json(
+  {
+    "record_size": 12,
+    "fields": [{"name": "x", "offset": -1, "type": "uint32"}]
+  }
+  )json";
+  EXPECT_THROW(RttDataMap::loadFromJsonText(json), std::runtime_error);
+}

@@ -57,7 +57,12 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
   }
 
   RttDataMap map;
-  map.record_size = static_cast<size_t>(root.value("record_size").toInt());
+  const int record_size_int = root.value("record_size").toInt();
+  if (record_size_int < 0)
+  {
+    throw std::runtime_error("RttDataMap: record_size nao pode ser negativo");
+  }
+  map.record_size = static_cast<size_t>(record_size_int);
   map.seq_field = root.value("seq_field").toString().toStdString();
   map.nominal_rate_hz = root.value("nominal_rate_hz").toDouble(1000.0);
 
@@ -72,7 +77,13 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
     }
     RttFieldDef field;
     field.name = field_obj.value("name").toString().toStdString();
-    field.offset = static_cast<size_t>(field_obj.value("offset").toInt());
+    const int offset_int = field_obj.value("offset").toInt();
+    if (offset_int < 0)
+    {
+      throw std::runtime_error("RttDataMap: campo '" + field.name +
+                                "' tem offset negativo");
+    }
+    field.offset = static_cast<size_t>(offset_int);
     field.type = field_obj.value("type").toString().toStdString();
     field.unit = field_obj.value("unit").toString().toStdString();
 
