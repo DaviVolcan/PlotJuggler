@@ -2,15 +2,9 @@
 
 #include <cstdint>
 #include <string>
-#include <utility>
 #include <vector>
 
-struct TelemetrySample
-{
-  double t = 0.0;
-  bool target_reset = false;
-  std::vector<std::pair<std::string, double>> values;
-};
+#include "telemetry_sample.h"
 
 class LineParser
 {

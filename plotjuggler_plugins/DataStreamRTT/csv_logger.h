@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "line_parser.h"
+#include "telemetry_sample.h"
 
 class CsvLogger
 {
