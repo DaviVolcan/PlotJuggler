@@ -7,6 +7,7 @@
 #include <QtPlugin>
 
 #include <memory>
+#include <string>
 
 #include "PlotJuggler/datastreamer_base.h"
 #include "binary_parser.h"
@@ -50,6 +51,7 @@ private slots:
 private:
   void connectToServer();
   void pushSamples(const std::vector<TelemetrySample>& samples);
+  void feedParser(const char* data, size_t len);
 
   QTcpSocket* _socket = nullptr;
   QTimer* _reconnect_timer = nullptr;
@@ -62,4 +64,10 @@ private:
   QString _host;
   int _port = 19021;
   int _channel = 1;
+
+  // Banner de texto que o GDB Server manda antes dos dados binarios (ver
+  // rtt_banner.h) - acumulado ate ser identificado e descartado, uma vez por
+  // conexao (connectToServer() reseta _banner_skipped a cada (re)conexao).
+  bool _banner_skipped = false;
+  std::string _pending_banner;
 };

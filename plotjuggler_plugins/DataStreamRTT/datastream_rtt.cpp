@@ -1,5 +1,7 @@
 #include "datastream_rtt.h"
 
+#include "rtt_banner.h"
+
 #include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -149,6 +151,8 @@ void DataStreamRTT::connectToServer()
     return;
   }
   _parser = std::make_unique<BinaryParser>(_data_map);
+  _banner_skipped = false;
+  _pending_banner.clear();
   _csv_logger.close();
   _socket->abort();
   _socket->connectToHost(_host, static_cast<quint16>(_port));
@@ -186,7 +190,32 @@ void DataStreamRTT::onSocketClosed()
 void DataStreamRTT::onReadyRead()
 {
   const QByteArray data = _socket->readAll();
-  const auto samples = _parser->feed(data.constData(), static_cast<size_t>(data.size()));
+  feedParser(data.constData(), static_cast<size_t>(data.size()));
+}
+
+void DataStreamRTT::feedParser(const char* data, size_t len)
+{
+  std::string remainder;
+  if (!_banner_skipped)
+  {
+    _pending_banner.append(data, len);
+    const size_t banner_end = RttBanner::findBannerEnd(_pending_banner);
+    if (banner_end == std::string::npos)
+    {
+      return;  // ainda pode ser banner - espera mais dados
+    }
+    _banner_skipped = true;
+    remainder = _pending_banner.substr(banner_end);
+    _pending_banner.clear();
+    data = remainder.data();
+    len = remainder.size();
+  }
+
+  if (len == 0)
+  {
+    return;
+  }
+  const auto samples = _parser->feed(data, len);
   if (!samples.empty())
   {
     pushSamples(samples);
