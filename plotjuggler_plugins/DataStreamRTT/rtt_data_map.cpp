@@ -47,7 +47,7 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
   if (parse_error.error != QJsonParseError::NoError || !doc.isObject())
   {
     throw std::runtime_error("RttDataMap: JSON invalido - " +
-                              parse_error.errorString().toStdString());
+                             parse_error.errorString().toStdString());
   }
   const QJsonObject root = doc.object();
 
@@ -59,7 +59,7 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
   if (root.contains("byte_order") && root.value("byte_order").toString() != "little")
   {
     throw std::runtime_error("RttDataMap: byte_order so' suporta 'little' (decode e' memcpy "
-                              "direto, sem conversao de endianness)");
+                             "direto, sem conversao de endianness)");
   }
 
   RttDataMap map;
@@ -71,6 +71,38 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
   map.record_size = static_cast<size_t>(record_size_int);
   map.seq_field = root.value("seq_field").toString().toStdString();
   map.nominal_rate_hz = root.value("nominal_rate_hz").toDouble(1000.0);
+  map.version = root.value("version").toInt(0);
+
+  // "magic" aceita string ("0xC3A55A02", mais legivel e o formato usado
+  // pelo mapa deste projeto) ou numero decimal. Ausente = formato legado
+  // sem enquadramento.
+  if (root.contains("magic"))
+  {
+    const QJsonValue magic_value = root.value("magic");
+    bool ok = false;
+    quint64 parsed = 0;
+    if (magic_value.isString())
+    {
+      parsed = magic_value.toString().toULongLong(&ok, 0);  // base 0: aceita 0x
+    }
+    else if (magic_value.isDouble())
+    {
+      const double as_double = magic_value.toDouble();
+      ok = as_double >= 0.0 && as_double <= 4294967295.0;
+      parsed = static_cast<quint64>(as_double);
+    }
+    if (!ok || parsed > 0xFFFFFFFFull)
+    {
+      throw std::runtime_error("RttDataMap: 'magic' precisa ser um uint32 valido "
+                               "(ex.: \"0xC3A55A02\")");
+    }
+    map.has_magic = true;
+    map.magic = static_cast<uint32_t>(parsed);
+    if (map.record_size < sizeof(uint32_t))
+    {
+      throw std::runtime_error("RttDataMap: record_size menor que a magic de 4 bytes");
+    }
+  }
 
   if (!root.value("fields").isArray())
   {
@@ -80,8 +112,7 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
   for (const QJsonValue& field_value : fields)
   {
     const QJsonObject field_obj = field_value.toObject();
-    if (!field_obj.contains("name") || !field_obj.contains("offset") ||
-        !field_obj.contains("type"))
+    if (!field_obj.contains("name") || !field_obj.contains("offset") || !field_obj.contains("type"))
     {
       throw std::runtime_error("RttDataMap: campo sem 'name'/'offset'/'type'");
     }
@@ -90,8 +121,7 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
     const int offset_int = field_obj.value("offset").toInt();
     if (offset_int < 0)
     {
-      throw std::runtime_error("RttDataMap: campo '" + field.name +
-                                "' tem offset negativo");
+      throw std::runtime_error("RttDataMap: campo '" + field.name + "' tem offset negativo");
     }
     field.offset = static_cast<size_t>(offset_int);
     field.type = field_obj.value("type").toString().toStdString();
@@ -100,8 +130,7 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
     const size_t type_size = typeSize(field.type);
     if (field.offset + type_size > map.record_size)
     {
-      throw std::runtime_error("RttDataMap: campo '" + field.name +
-                                "' ultrapassa record_size");
+      throw std::runtime_error("RttDataMap: campo '" + field.name + "' ultrapassa record_size");
     }
     map.fields.push_back(std::move(field));
   }
@@ -113,13 +142,12 @@ RttDataMap RttDataMap::loadFromJsonText(const std::string& json_text)
 
   if (!map.seq_field.empty())
   {
-    const bool found =
-        std::any_of(map.fields.begin(), map.fields.end(),
-                    [&](const RttFieldDef& f) { return f.name == map.seq_field; });
+    const bool found = std::any_of(map.fields.begin(), map.fields.end(),
+                                   [&](const RttFieldDef& f) { return f.name == map.seq_field; });
     if (!found)
     {
       throw std::runtime_error("RttDataMap: seq_field '" + map.seq_field +
-                                "' nao existe em 'fields'");
+                               "' nao existe em 'fields'");
     }
   }
 

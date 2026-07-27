@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,20 @@ struct RttDataMap
   std::string seq_field;
   double nominal_rate_hz = 1000.0;
   std::vector<RttFieldDef> fields;
+
+  // Palavra de sincronismo no inicio de cada registro (offset 0, little
+  // endian). RTT e' um stream de bytes sem enquadramento e o host nunca
+  // comeca a ler num limite de registro, entao sem magic o parser
+  // desliza e decodifica lixo plausivel silenciosamente. Opcional:
+  // has_magic == false mantem o comportamento legado (assume que o
+  // primeiro byte recebido inicia um registro).
+  bool has_magic = false;
+  uint32_t magic = 0;
+
+  // Versao do layout, espelhada no byte baixo da magic pelo firmware
+  // (ver Core/Inc/telemetry.h). Serve para diagnostico: um firmware com
+  // layout diferente simplesmente nunca sincroniza.
+  int version = 0;
 
   static size_t typeSize(const std::string& type);
 

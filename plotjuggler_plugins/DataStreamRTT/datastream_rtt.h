@@ -1,5 +1,6 @@
 /* Plugin DataStreamer do PlotJuggler: le telemetria do canal RTT via a
-   porta telnet TCP do J-Link GDB Server (padrao localhost:19021). */
+   porta telnet TCP do J-Link GDB Server (localhost:2334 neste
+   projeto, ver .idea/debugServers/). */
 #pragma once
 
 #include <QTcpSocket>
@@ -62,12 +63,11 @@ private:
   bool _running = false;
   bool _warned_once = false;
   QString _host;
-  int _port = 19021;
-  int _channel = 1;
-
-  // Banner de texto que o GDB Server manda antes dos dados binarios (ver
-  // rtt_banner.h) - acumulado ate ser identificado e descartado, uma vez por
-  // conexao (connectToServer() reseta _banner_skipped a cada (re)conexao).
-  bool _banner_skipped = false;
-  std::string _pending_banner;
+  // Porta telnet do GDB Server. 2334 e' a configurada nos debug servers
+  // deste projeto (-RTTTelnetPort 2334), nao a default 19021 da SEGGER.
+  int _port = 2334;
+  // Canal RTT da telemetria (RTT_TRANSPORT_CHANNEL no firmware). O canal
+  // 1 e' do SystemView e o 0 e' o Terminal - apontar para eles nao rende
+  // telemetria nenhuma.
+  int _channel = 2;
 };

@@ -1,7 +1,5 @@
 #include "datastream_rtt.h"
 
-#include "rtt_banner.h"
-
 #include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -44,10 +42,10 @@ bool DataStreamRTT::start(QStringList*)
   auto* host_edit = new QLineEdit(settings.value("DataStreamRTT/host", "127.0.0.1").toString());
   auto* port_spin = new QSpinBox();
   port_spin->setRange(1, 65535);
-  port_spin->setValue(settings.value("DataStreamRTT/port", 19021).toInt());
+  port_spin->setValue(settings.value("DataStreamRTT/port", 2334).toInt());
   auto* channel_spin = new QSpinBox();
   channel_spin->setRange(0, 15);
-  channel_spin->setValue(settings.value("DataStreamRTT/channel", 1).toInt());
+  channel_spin->setValue(settings.value("DataStreamRTT/channel", 2).toInt());
   auto* csv_check = new QCheckBox("Gravar CSV do ensaio");
   csv_check->setChecked(settings.value("DataStreamRTT/csv_enabled", false).toBool());
   auto* csv_dir_edit = new QLineEdit(settings.value("DataStreamRTT/csv_dir", "").toString());
@@ -66,8 +64,8 @@ bool DataStreamRTT::start(QStringList*)
   auto* map_path_edit = new QLineEdit(settings.value("DataStreamRTT/data_map_path", "").toString());
   auto* map_browse = new QPushButton("...");
   QObject::connect(map_browse, &QPushButton::clicked, [&]() {
-    const QString path = QFileDialog::getOpenFileName(&dialog, "Mapa de dados (JSON)", QString(),
-                                                        "JSON (*.json)");
+    const QString path =
+        QFileDialog::getOpenFileName(&dialog, "Mapa de dados (JSON)", QString(), "JSON (*.json)");
     if (!path.isEmpty())
     {
       map_path_edit->setText(path);
@@ -125,7 +123,7 @@ bool DataStreamRTT::start(QStringList*)
   catch (const std::exception& e)
   {
     QMessageBox::warning(nullptr, "RTT Streamer",
-                          QString("Falha ao carregar o mapa de dados:\n%1").arg(e.what()));
+                         QString("Falha ao carregar o mapa de dados:\n%1").arg(e.what()));
     return false;
   }
   settings.setValue("DataStreamRTT/data_map_path", _data_map_path);
@@ -151,8 +149,6 @@ void DataStreamRTT::connectToServer()
     return;
   }
   _parser = std::make_unique<BinaryParser>(_data_map);
-  _banner_skipped = false;
-  _pending_banner.clear();
   _csv_logger.close();
   _socket->abort();
   _socket->connectToHost(_host, static_cast<quint16>(_port));
@@ -161,8 +157,7 @@ void DataStreamRTT::connectToServer()
 void DataStreamRTT::onConnected()
 {
   // A config string precisa chegar em ate 100 ms apos o connect.
-  const QByteArray cfg =
-      "$$SEGGER_TELNET_ConfigStr=RTTCh;" + QByteArray::number(_channel) + "$$";
+  const QByteArray cfg = "$$SEGGER_TELNET_ConfigStr=RTTCh;" + QByteArray::number(_channel) + "$$";
   _socket->write(cfg);
 }
 
@@ -176,12 +171,12 @@ void DataStreamRTT::onSocketClosed()
   if (!_warned_once)
   {
     _warned_once = true;
-    auto* box = new QMessageBox(
-        QMessageBox::Information, "RTT Streamer",
-        QString("Sem conexao com %1:%2 (o GDB server do J-Link esta rodando?).\n"
-                "Vou tentar reconectar a cada segundo em segundo plano.")
-            .arg(_host)
-            .arg(_port));
+    auto* box =
+        new QMessageBox(QMessageBox::Information, "RTT Streamer",
+                        QString("Sem conexao com %1:%2 (o GDB server do J-Link esta rodando?).\n"
+                                "Vou tentar reconectar a cada segundo em segundo plano.")
+                            .arg(_host)
+                            .arg(_port));
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->show();
   }
@@ -195,26 +190,15 @@ void DataStreamRTT::onReadyRead()
 
 void DataStreamRTT::feedParser(const char* data, size_t len)
 {
-  std::string remainder;
-  if (!_banner_skipped)
-  {
-    _pending_banner.append(data, len);
-    const size_t banner_end = RttBanner::findBannerEnd(_pending_banner);
-    if (banner_end == std::string::npos)
-    {
-      return;  // ainda pode ser banner - espera mais dados
-    }
-    _banner_skipped = true;
-    remainder = _pending_banner.substr(banner_end);
-    _pending_banner.clear();
-    data = remainder.data();
-    len = remainder.size();
-  }
-
   if (len == 0)
   {
     return;
   }
+  // Nao ha mais tratamento especial do banner de texto do GDB Server: a
+  // magic no inicio de cada registro (ver Core/Inc/telemetry.h) enquadra
+  // o stream sozinha, e o banner simplesmente nao casa com ela. A antiga
+  // heuristica de texto era indecidivel na raiz - nao da para distinguir
+  // o '\n' final do banner de um 0x0A que comeca o payload binario.
   const auto samples = _parser->feed(data, len);
   if (!samples.empty())
   {
@@ -281,8 +265,8 @@ bool DataStreamRTT::xmlLoadState(const QDomElement& parent_element)
   }
   QSettings settings;
   settings.setValue("DataStreamRTT/host", elem.attribute("host", "127.0.0.1"));
-  settings.setValue("DataStreamRTT/port", elem.attribute("port", "19021").toInt());
-  settings.setValue("DataStreamRTT/channel", elem.attribute("channel", "1").toInt());
+  settings.setValue("DataStreamRTT/port", elem.attribute("port", "2334").toInt());
+  settings.setValue("DataStreamRTT/channel", elem.attribute("channel", "2").toInt());
   settings.setValue("DataStreamRTT/data_map_path", elem.attribute("data_map_path", ""));
   return true;
 }
