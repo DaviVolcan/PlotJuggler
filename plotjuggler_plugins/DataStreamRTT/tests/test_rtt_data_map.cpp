@@ -117,3 +117,50 @@ TEST(RttDataMap, LoadFromFileThrowsOnMissingFile)
 {
   EXPECT_THROW(RttDataMap::loadFromFile("/no/such/file.json"), std::runtime_error);
 }
+
+TEST(RttDataMap, ParsesDumpKeys)
+{
+  const RttDataMap map = RttDataMap::loadFromJsonText(R"json(
+  {
+    "record_size": 12, "seq_field": "seq", "magic": "0xC3A55A06",
+    "dump_magic": "0xC3A55A86", "seq_step": 8, "reset_below_seq": 80000,
+    "dump_fields": ["ib"],
+    "fields": [
+      {"name": "seq", "offset": 4, "type": "uint32"},
+      {"name": "ib",  "offset": 8, "type": "float32"}
+    ]
+  }
+  )json");
+  EXPECT_TRUE(map.has_dump_magic);
+  EXPECT_EQ(map.dump_magic, 0xC3A55A86u);
+  EXPECT_EQ(map.seq_step, 8);
+  EXPECT_EQ(map.reset_below_seq, 80000);
+  ASSERT_EQ(map.dump_fields.size(), 1u);
+  EXPECT_EQ(map.dump_fields[0], "ib");
+}
+
+TEST(RttDataMap, DefaultsWithoutDumpKeys)
+{
+  const RttDataMap map = RttDataMap::loadFromJsonText(R"json(
+  {
+    "record_size": 8, "seq_field": "seq",
+    "fields": [{"name": "seq", "offset": 0, "type": "uint32"},
+               {"name": "ib",  "offset": 4, "type": "float32"}]
+  }
+  )json");
+  EXPECT_FALSE(map.has_dump_magic);
+  EXPECT_EQ(map.seq_step, 1);
+  EXPECT_EQ(map.reset_below_seq, -1);
+  EXPECT_TRUE(map.dump_fields.empty());
+}
+
+TEST(RttDataMap, RejectsUnknownDumpField)
+{
+  EXPECT_THROW(RttDataMap::loadFromJsonText(R"json(
+  {
+    "record_size": 8, "seq_field": "seq", "dump_fields": ["nao_existe"],
+    "fields": [{"name": "seq", "offset": 0, "type": "uint32"},
+               {"name": "ib",  "offset": 4, "type": "float32"}]
+  }
+  )json"), std::runtime_error);
+}

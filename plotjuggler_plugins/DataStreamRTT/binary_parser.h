@@ -48,9 +48,10 @@ public:
   }
 
 private:
-  bool decodeRecord(const uint8_t* record, TelemetrySample& out);
+  bool decodeRecord(const uint8_t* record, bool is_dump, TelemetrySample& out);
   double fieldValue(const uint8_t* record, const RttFieldDef& field) const;
   bool magicAt(size_t pos) const;
+  bool dumpMagicAt(size_t pos) const;
   // Procura o proximo inicio de registro plausivel a partir de `from`.
   // Exige confirmacao (magic tambem um registro adiante) quando ha bytes
   // suficientes; sem isso aceita provisoriamente, porque cada registro
@@ -60,6 +61,7 @@ private:
   RttDataMap _map;
   std::string _buffer;
   int64_t _last_seq = -1;
+  bool _after_dump = false;  // proximo registro ao vivo nao conta o salto do dump como gap
   uint64_t _malformed = 0;
   uint64_t _seq_gaps = 0;
   uint64_t _discarded = 0;

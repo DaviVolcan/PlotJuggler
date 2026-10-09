@@ -40,6 +40,19 @@ struct RttDataMap
   // layout diferente simplesmente nunca sincroniza.
   int version = 0;
 
+  // Telemetria v6 (captura rapida da malha de corrente, TCC Fase 12):
+  // registros de dump levam a magic com o bit 0x80 na versao, trazem so'
+  // os campos de dump_fields e um seq (tick de 8 kHz) do passado.
+  bool has_dump_magic = false;
+  uint32_t dump_magic = 0;
+  std::vector<std::string> dump_fields;
+  // Incremento nominal do seq entre registros ao vivo (v6: 8, tick de
+  // 8 kHz amostrado a 1 kHz). Gap so' acima de 2x isso (jitter da task).
+  int64_t seq_step = 1;
+  // Reset do alvo so' quando o seq volta E fica abaixo disto (o tick
+  // zera no boot). -1 = legado: qualquer retrocesso e' reset.
+  int64_t reset_below_seq = -1;
+
   static size_t typeSize(const std::string& type);
 
   // Throws std::runtime_error with a human-readable message on any

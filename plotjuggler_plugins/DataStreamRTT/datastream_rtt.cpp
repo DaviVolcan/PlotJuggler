@@ -228,14 +228,17 @@ void DataStreamRTT::pushSamples(const std::vector<TelemetrySample>& samples)
         }
         it->second.pushBack(PJ::PlotData::Point(sample.t, value));
       }
-      const std::string err_name = "rtt/_parse_errors";
-      auto it = dataMap().numeric.find(err_name);
-      if (it == dataMap().numeric.end())
+      if (!sample.is_dump)  // contador de erros nao ganha pontos no passado
       {
-        it = dataMap().addNumeric(err_name);
+        const std::string err_name = "rtt/_parse_errors";
+        auto it = dataMap().numeric.find(err_name);
+        if (it == dataMap().numeric.end())
+        {
+          it = dataMap().addNumeric(err_name);
+        }
+        it->second.pushBack(
+            PJ::PlotData::Point(sample.t, static_cast<double>(_parser->malformedCount())));
       }
-      it->second.pushBack(
-          PJ::PlotData::Point(sample.t, static_cast<double>(_parser->malformedCount())));
     }
   }
   if (reset_seen)

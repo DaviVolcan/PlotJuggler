@@ -36,6 +36,33 @@ std::string PackRecord(uint32_t seq, float ib, float ic)
   std::memcpy(&buf[8], &ic, 4);
   return buf;
 }
+
+RttDataMap DumpMap()
+{
+  return RttDataMap::loadFromJsonText(R"json(
+  {
+    "record_size": 12, "seq_field": "seq", "nominal_rate_hz": 8000,
+    "magic": "0xC3A55A06", "dump_magic": "0xC3A55A86",
+    "seq_step": 8, "reset_below_seq": 80000, "dump_fields": ["ib"],
+    "fields": [
+      {"name": "seq", "offset": 4, "type": "uint32"},
+      {"name": "ib",  "offset": 8, "type": "float32", "unit": "A"}
+    ]
+  }
+  )json");
+}
+
+std::string PackV6(uint32_t magic, uint32_t seq, float ib)
+{
+  std::string buf(12, '\0');
+  std::memcpy(&buf[0], &magic, 4);
+  std::memcpy(&buf[4], &seq, 4);
+  std::memcpy(&buf[8], &ib, 4);
+  return buf;
+}
+
+constexpr uint32_t kLive = 0xC3A55A06u;
+constexpr uint32_t kDump = 0xC3A55A86u;
 }  // namespace
 
 TEST(BinaryParser, DecodesSingleRecord)
@@ -232,4 +259,74 @@ TEST(BinaryParserMagic, HandlesMagicSplitAcrossFeeds)
   EXPECT_TRUE(samples.empty());
   samples = parser.feed(stream.data() + 2, stream.size() - 2);
   EXPECT_EQ(samples.size(), 3u);
+}
+
+TEST(BinaryParser, DumpRecordDoesNotTriggerReset)
+{
+  BinaryParser parser(DumpMap());
+  std::string s = PackV6(kLive, 96000, 0.0f) + PackV6(kDump, 20000, 1.0f) +
+                  PackV6(kLive, 96008, 0.0f);
+  const auto samples = parser.feed(s.data(), s.size());
+  ASSERT_EQ(samples.size(), 3u);
+  EXPECT_FALSE(samples[1].target_reset);
+  EXPECT_TRUE(samples[1].is_dump);
+  EXPECT_DOUBLE_EQ(samples[1].t, 20000.0 / 8000.0);
+  EXPECT_FALSE(samples[2].target_reset);
+}
+
+TEST(BinaryParser, DumpRecordPublishesOnlyDumpFields)
+{
+  BinaryParser parser(DumpMap());
+  std::string s = PackV6(kDump, 20000, 1.5f) + PackV6(kDump, 20001, 1.6f);
+  const auto samples = parser.feed(s.data(), s.size());
+  ASSERT_EQ(samples.size(), 2u);
+  ASSERT_EQ(samples[0].values.size(), 1u);
+  EXPECT_EQ(samples[0].values[0].first, "ib");
+  EXPECT_FLOAT_EQ(static_cast<float>(samples[0].values[0].second), 1.5f);
+}
+
+TEST(BinaryParser, SyncsOnMixedMagics)
+{
+  BinaryParser parser(DumpMap());
+  std::string s = std::string("lixo") + PackV6(kDump, 20000, 1.0f) + PackV6(kLive, 96000, 0.0f);
+  const auto samples = parser.feed(s.data(), s.size());
+  ASSERT_EQ(samples.size(), 2u);
+  EXPECT_TRUE(samples[0].is_dump);
+  EXPECT_FALSE(samples[1].is_dump);
+}
+
+// Jitter 7-9 da task nao e' gap; buraco real conta.
+TEST(BinaryParser, LiveSeqStepToleratesJitter)
+{
+  BinaryParser parser(DumpMap());
+  std::string s = PackV6(kLive, 8, 0) + PackV6(kLive, 15, 0) + PackV6(kLive, 24, 0) +
+                  PackV6(kLive, 32, 0);
+  parser.feed(s.data(), s.size());
+  EXPECT_EQ(parser.sequenceGaps(), 0u);
+  std::string hole = PackV6(kLive, 64, 0);  // faltaram 3 registros (40, 48, 56)
+  parser.feed(hole.data(), hole.size());
+  EXPECT_EQ(parser.sequenceGaps(), 3u);
+}
+
+TEST(BinaryParser, ResetOnlyBelowThreshold)
+{
+  BinaryParser parser(DumpMap());
+  std::string s = PackV6(kLive, 100000, 0) + PackV6(kLive, 90000, 0);
+  auto samples = parser.feed(s.data(), s.size());
+  ASSERT_EQ(samples.size(), 2u);
+  EXPECT_FALSE(samples[1].target_reset);
+  std::string boot = PackV6(kLive, 800, 0);
+  samples = parser.feed(boot.data(), boot.size());
+  ASSERT_EQ(samples.size(), 1u);
+  EXPECT_TRUE(samples[0].target_reset);
+}
+
+// O salto do seq ao vivo por causa do dump nao e' perda.
+TEST(BinaryParser, NoGapAfterDump)
+{
+  BinaryParser parser(DumpMap());
+  std::string s = PackV6(kLive, 96000, 0) + PackV6(kDump, 20000, 0) +
+                  PackV6(kDump, 20001, 0) + PackV6(kLive, 105200, 0);
+  parser.feed(s.data(), s.size());
+  EXPECT_EQ(parser.sequenceGaps(), 0u);
 }

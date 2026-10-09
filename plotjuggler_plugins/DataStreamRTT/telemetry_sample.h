@@ -14,5 +14,6 @@ struct TelemetrySample
 {
   double t = 0.0;
   bool target_reset = false;
+  bool is_dump = false;  // registro da captura rapida (magic de dump)
   std::vector<std::pair<std::string, double>> values;
 };

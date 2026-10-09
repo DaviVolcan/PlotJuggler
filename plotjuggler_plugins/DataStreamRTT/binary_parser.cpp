@@ -39,7 +39,7 @@ double BinaryParser::fieldValue(const uint8_t* record, const RttFieldDef& field)
   return static_cast<double>(v);
 }
 
-bool BinaryParser::decodeRecord(const uint8_t* record, TelemetrySample& out)
+bool BinaryParser::decodeRecord(const uint8_t* record, bool is_dump, TelemetrySample& out)
 {
   int64_t seq = -1;
   for (const RttFieldDef& field : _map.fields)
@@ -49,25 +49,47 @@ bool BinaryParser::decodeRecord(const uint8_t* record, TelemetrySample& out)
     {
       return false;
     }
-    out.values.emplace_back(field.name, value);
     if (field.name == _map.seq_field)
     {
       seq = static_cast<int64_t>(value);
     }
+    const bool publish =
+        !is_dump || std::find(_map.dump_fields.begin(), _map.dump_fields.end(), field.name) !=
+                        _map.dump_fields.end();
+    if (publish)
+    {
+      out.values.emplace_back(field.name, value);
+    }
   }
+  out.is_dump = is_dump;
 
   if (!_map.seq_field.empty())
   {
-    if (_last_seq >= 0 && seq < _last_seq)
+    out.t = _map.nominal_rate_hz > 0.0 ? static_cast<double>(seq) / _map.nominal_rate_hz : 0.0;
+    if (is_dump)
+    {
+      // Dump: seq do passado. Nao mexe na deteccao de reset/gap do ao
+      // vivo; o proximo registro ao vivo nao conta o salto como perda.
+      _after_dump = true;
+      return true;
+    }
+    if (_last_seq >= 0 && seq < _last_seq &&
+        (_map.reset_below_seq < 0 || seq < _map.reset_below_seq))
     {
       out.target_reset = true;
     }
-    else if (_last_seq >= 0 && seq > _last_seq + 1)
+    else if (_last_seq >= 0 && !_after_dump && seq > _last_seq)
     {
-      _seq_gaps += static_cast<uint64_t>(seq - _last_seq - 1);
+      const int64_t step = _map.seq_step;
+      const int64_t delta = seq - _last_seq;
+      const int64_t tolerance = (step > 1) ? 2 * step : 1;
+      if (delta > tolerance)
+      {
+        _seq_gaps += static_cast<uint64_t>((delta + step / 2) / step - 1);
+      }
     }
+    _after_dump = false;
     _last_seq = seq;
-    out.t = _map.nominal_rate_hz > 0.0 ? static_cast<double>(seq) / _map.nominal_rate_hz : 0.0;
   }
   return true;
 }
@@ -80,7 +102,18 @@ bool BinaryParser::magicAt(size_t pos) const
   }
   uint32_t value;
   std::memcpy(&value, _buffer.data() + pos, sizeof(value));
-  return value == _map.magic;
+  return value == _map.magic || (_map.has_dump_magic && value == _map.dump_magic);
+}
+
+bool BinaryParser::dumpMagicAt(size_t pos) const
+{
+  if (!_map.has_dump_magic || pos + sizeof(uint32_t) > _buffer.size())
+  {
+    return false;
+  }
+  uint32_t value;
+  std::memcpy(&value, _buffer.data() + pos, sizeof(value));
+  return value == _map.dump_magic;
 }
 
 size_t BinaryParser::findSync(size_t from) const
@@ -117,7 +150,7 @@ std::vector<TelemetrySample> BinaryParser::feed(const char* data, size_t len)
     {
       const auto* record = reinterpret_cast<const uint8_t*>(_buffer.data());
       TelemetrySample sample;
-      if (decodeRecord(record, sample))
+      if (decodeRecord(record, false, sample))
       {
         out.push_back(std::move(sample));
       }
@@ -170,7 +203,7 @@ std::vector<TelemetrySample> BinaryParser::feed(const char* data, size_t len)
 
     const auto* record = reinterpret_cast<const uint8_t*>(_buffer.data());
     TelemetrySample sample;
-    if (decodeRecord(record, sample))
+    if (decodeRecord(record, dumpMagicAt(0), sample))
     {
       out.push_back(std::move(sample));
     }
