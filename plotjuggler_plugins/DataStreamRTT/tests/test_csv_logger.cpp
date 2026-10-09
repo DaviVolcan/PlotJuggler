@@ -53,6 +53,23 @@ TEST_F(CsvLoggerTest, WritesHeaderFromFirstSampleAndRows)
   EXPECT_EQ(content, "t,n,ia\n0.001000,1,0.5\n0.002000,2,0.6\n");
 }
 
+TEST_F(CsvLoggerTest, DumpSampleDoesNotOpenFileWithTruncatedHeader)
+{
+  CsvLogger logger;
+  logger.setDirectory(_dir.string());
+  TelemetrySample dump;
+  dump.t = 0.5;
+  dump.is_dump = true;
+  dump.values = { { "ia", 0.1 } };
+  logger.onSample(dump);  // arquivo ainda fechado: descartado
+  EXPECT_TRUE(logger.currentFile().empty());
+  logger.onSample(makeSample(0.001, 0.5));
+  logger.onSample(dump);  // com arquivo aberto: linha com so' a coluna do dump
+  logger.close();
+
+  EXPECT_EQ(readFile(logger.currentFile()), "t,n,ia\n0.001000,1,0.5\n0.500000,,0.1\n");
+}
+
 TEST_F(CsvLoggerTest, RotatesFileOnTargetReset)
 {
   CsvLogger logger;

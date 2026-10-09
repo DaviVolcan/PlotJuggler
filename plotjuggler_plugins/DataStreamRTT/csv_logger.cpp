@@ -74,6 +74,13 @@ void CsvLogger::onSample(const TelemetrySample& sample)
   }
   if (!_file.is_open())
   {
+    // Registro de dump so' tem as colunas de dump_fields: abrir o arquivo
+    // com ele geraria um cabecalho truncado e os registros ao vivo
+    // seguintes perderiam colunas. O cabecalho vem do 1o registro ao vivo.
+    if (sample.is_dump)
+    {
+      return;
+    }
     openNewFile(sample);
   }
 
